@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/common/window.dart';
 import 'package:fl_clash/bootstrap.dart';
 import 'package:fl_clash/common/system_dns.dart';
