@@ -225,6 +225,7 @@ const customProxyTypes = [
   'ssh',
   'mieru',
   'anytls',
+  'lightxtreme',
   'sudoku',
   'masque',
   'trusttunnel',
