@@ -777,5 +777,9 @@
   "large": "大",
   "extraLarge": "特大",
   "switchProfile": "プロファイルを切り替え",
-  "lastUpdated": "最終更新"
+  "lastUpdated": "最終更新",
+  "communityChannel": "TGチャンネル",
+  "communityVisit": "チャンネルへ",
+  "communityHideWelcome": "今後通知しない",
+  "communitySkipAutoJump": "次回は開かない"
 }

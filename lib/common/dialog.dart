@@ -162,7 +162,10 @@ class Dialogs {
     );
   }
 
-  Future<void> openUrl(String url) async {
+  Future<void> openUrl(
+    String url, {
+    LaunchMode mode = LaunchMode.platformDefault,
+  }) async {
     final res = await showMessage(
       message: TextSpan(text: url),
       title: currentAppLocalizations.externalLink,
@@ -171,7 +174,7 @@ class Dialogs {
     if (res != true) {
       return;
     }
-    unawaited(launchUrl(Uri.parse(url)));
+    unawaited(launchUrl(Uri.parse(url), mode: mode));
   }
 }
 

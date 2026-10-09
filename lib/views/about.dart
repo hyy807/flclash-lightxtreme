@@ -1,5 +1,8 @@
 import 'dart:async';
 
+import 'package:fl_clash/common/community.dart';
+import 'package:url_launcher/url_launcher.dart';
+
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/icons/icons.dart';
@@ -42,6 +45,7 @@ class AboutView extends ConsumerWidget {
     required String title,
     required String url,
     required String label,
+    LaunchMode mode = LaunchMode.platformDefault,
   }) {
     return ListItem(
       leading: _LinkBadge(glyph: glyph),
@@ -49,7 +53,7 @@ class AboutView extends ConsumerWidget {
       subtitle: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
       trailing: const GlyphIcon(AppGlyphs.openExternal),
       onTap: () {
-        dialogs.openUrl(url);
+        dialogs.openUrl(url, mode: mode);
       },
     );
   }
@@ -96,6 +100,13 @@ class AboutView extends ConsumerWidget {
                 title: appLocalizations.core,
                 url: 'https://github.com/chen08209/Clash.Meta/tree/FlClash',
                 label: 'github.com/chen08209/Clash.Meta',
+              ),
+              _buildLinkItem(
+                glyph: AppGlyphs.send,
+                title: appLocalizations.communityChannel,
+                url: communityUrl,
+                label: communityUrl,
+                mode: LaunchMode.externalApplication,
               ),
               _buildLinkItem(
                 glyph: AppGlyphs.send,

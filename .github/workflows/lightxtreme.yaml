@@ -29,20 +29,24 @@ jobs:
 
         '
     - name: Validate fixture
-      run: "cat > /tmp/lightxtreme.yaml <<'EOF'\nproxies:\n  - name: lightxtreme-fixture\n    type: lightxtreme\n    server: example.invalid\n\
-        \    port: 443\n    password: 00112233445566778899aabbccddeeff\n    platform-marker: 3\n    sni: example.invalid\n    client-fingerprint:\
-        \ chrome\n    udp: true\nrules:\n  - MATCH,lightxtreme-fixture\nEOF\n/tmp/lightxtreme-core -t -f /tmp/lightxtreme.yaml -d /tmp/lxcheck\n"
+      run: "cat > /tmp/lightxtreme.yaml <<'EOF'\nproxies:\n  - name: lightxtreme-fixture\n\
+        \    type: lightxtreme\n    server: example.invalid\n    port: 443\n    password:\
+        \ 00112233445566778899aabbccddeeff\n    platform-marker: 3\n    sni: example.invalid\n\
+        \    client-fingerprint: chrome\n    udp: true\nrules:\n  - MATCH,lightxtreme-fixture\n\
+        EOF\n/tmp/lightxtreme-core -t -f /tmp/lightxtreme.yaml -d /tmp/lxcheck\n"
     - name: Validate exact private user YAML
       env:
         CONFIG_GZ_B64: ${{ secrets.UNIVERSAL_CONFIG_GZ_B64 }}
       run: "python3 - <<'PY'\nimport os,base64,gzip,hashlib,pathlib,subprocess\nraw=gzip.decompress(base64.b64decode(os.environ['CONFIG_GZ_B64']))\n\
-        assert hashlib.sha256(raw).hexdigest()=='69d174fede78302b989210d0d64d035c99ffa938db8c9f91b28e0a59fece84d2'\np=pathlib.Path('/tmp/private-config.yaml');p.write_bytes(raw)\n\
-        r=subprocess.run(['/tmp/lightxtreme-core','-t','-f',str(p),'-d','/tmp/lxprivate'],stdout=subprocess.PIPE,stderr=subprocess.STDOUT)\np.unlink()\n\
-        if r.returncode:\n print('Exact user YAML validation failed (private log withheld)')\n raise SystemExit(r.returncode)\nprint('Exact user\
-        \ YAML SHA256 and core config check PASS; config not published')\nPY\n"
+        assert hashlib.sha256(raw).hexdigest()=='69d174fede78302b989210d0d64d035c99ffa938db8c9f91b28e0a59fece84d2'\n\
+        p=pathlib.Path('/tmp/private-config.yaml');p.write_bytes(raw)\nr=subprocess.run(['/tmp/lightxtreme-core','-t','-f',str(p),'-d','/tmp/lxprivate'],stdout=subprocess.PIPE,stderr=subprocess.STDOUT)\n\
+        p.unlink()\nif r.returncode:\n print('Exact user YAML validation failed (private\
+        \ log withheld)')\n raise SystemExit(r.returncode)\nprint('Exact user YAML\
+        \ SHA256 and core config check PASS; config not published')\nPY\n"
   build:
     needs:
     - protocol
+    - verify
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -100,10 +104,13 @@ jobs:
         flutter pub get
 
         '
+    - name: Generate community translations
+      run: dart run intl_utils:generate
     - name: Setup
       env:
         ANDROID_NDK_HOME: ${{ steps.build-ndk.outputs.ndk-path }}
-      run: dart setup.dart ${{ matrix.platform }} --env pre -v
+      run: dart setup.dart ${{ matrix.platform }} --env pre ${{ matrix.arch && format('--arch
+        {0}', matrix.arch) || '' }} -v
     - name: Upload packages
       uses: actions/upload-artifact@v4
       with:
@@ -138,7 +145,39 @@ jobs:
 
         find dist -type f -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS.txt
 
-        gh release create "lightxtreme-$RUN_ID" --repo "$REPO" --prerelease --title "FlClash LightXtreme $RUN_ID" --notes "Official FlClash baseline;
-        only LightXtreme added. Android uses upstream development signing fallback. No device testing claimed." $(find dist -type f) SHA256SUMS.txt
+        gh release create "lightxtreme-$RUN_ID" --repo "$REPO" --prerelease --title
+        "FlClash LightXtreme $RUN_ID" --notes "Official FlClash baseline; LightXtreme
+        plus Telegram launch/welcome/About added. Independent opt-outs; external system
+        handler. Android uses upstream development signing fallback. No device testing
+        claimed." $(find dist -type f) SHA256SUMS.txt
 
         '
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: subosito/flutter-action@v2
+      with:
+        channel: master
+        flutter-version: ${{ env.FLUTTER_VERSION }}
+        cache: true
+    - name: Disable native build hooks for focused Dart checks
+      run: 'python3 - <<''PY''
+
+        import pathlib
+
+        p=pathlib.Path(''pubspec.yaml'');s=p.read_text();p.write_text(s.replace(''build_assets:
+        true'',''build_assets: false''))
+
+        PY'
+    - run: 'flutter pub get
+
+        dart run intl_utils:generate
+
+        dart format lib/common/community.dart lib/widgets/community_welcome.dart test/common/community_test.dart
+        test/widgets/community_welcome_test.dart
+
+        flutter analyze --no-fatal-infos
+
+        flutter test test/common/community_test.dart test/widgets/community_welcome_test.dart
+        test/l10n test/lint/dynamic_message_key_test.dart'

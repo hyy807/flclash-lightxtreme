@@ -777,5 +777,9 @@
   "large": "Large",
   "extraLarge": "Extra large",
   "switchProfile": "Switch profile",
-  "lastUpdated": "Last updated"
+  "lastUpdated": "Last updated",
+  "communityChannel": "TG channel",
+  "communityVisit": "Visit channel",
+  "communityHideWelcome": "Do not remind again",
+  "communitySkipAutoJump": "Do not open next time"
 }

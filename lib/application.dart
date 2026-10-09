@@ -20,6 +20,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'pages/pages.dart';
+import 'common/community.dart';
+import 'widgets/community_welcome.dart';
 
 Widget buildManagerStack({
   required bool isDesktop,
@@ -101,8 +103,32 @@ class ApplicationState extends ConsumerState<Application> {
       _initLink();
       if (!safeModeBuild) {
         unawaited(app?.initShortcuts());
+        unawaited(_showCommunity());
       }
     });
+  }
+
+  Future<void> _showCommunity() async {
+    try {
+      final savedPreferences = await preferences.sharedPreferencesCompleter.future;
+      if (!mounted || savedPreferences == null) return;
+      await communityLaunch.run(
+        preferences: savedPreferences,
+        showWelcome: () async {
+          final navigatorContext = globalState.navigatorKey.currentContext;
+          if (!mounted || navigatorContext == null) return null;
+          return showDialog<CommunityChoice>(
+            context: navigatorContext,
+            builder: (_) => const CommunityWelcome(),
+          );
+        },
+        openChannel: () async {
+          if (mounted) await openCommunityChannel();
+        },
+      );
+    } catch (error) {
+      commonPrint.log('Community launch failed: $error', logLevel: LogLevel.warning);
+    }
   }
 
   void _initLink() {
