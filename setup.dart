@@ -68,7 +68,12 @@ Future<void> main(List<String> args) async {
   }
   final arch = _detectArch();
   final targets = createPackageTargets(platform, results['targets']);
-  final androidArch = results['arch'] as String?;
+  final requestedArch = results['arch'] as String?;
+  if (platform != 'android' && requestedArch != null && requestedArch != arch) {
+    stderr.writeln('Requested $requestedArch but host builds $arch');
+    exit(1);
+  }
+  final androidArch = platform == 'android' ? requestedArch : null;
   final verbose = results['verbose'] as bool;
 
   final exitCode = await _package(
@@ -100,7 +105,7 @@ ArgParser createSetupArgParser() {
       'arch',
       valueHelp: 'arm,arm64,amd64',
       allowed: ['arm', 'arm64', 'amd64'],
-      help: 'Target architecture (Android only)',
+      help: 'Target architecture (desktop must match host)',
     )
     ..addFlag(
       'verbose',
