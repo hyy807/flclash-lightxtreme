@@ -801,7 +801,6 @@ const _listener = YamlSchema.map({
     'tuic',
     'hysteria2',
     'anytls',
-    'lightxtreme',
     'mieru',
   ]),
   'port': _str,
