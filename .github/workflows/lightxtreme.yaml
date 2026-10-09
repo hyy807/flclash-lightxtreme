@@ -1,0 +1,136 @@
+name: LightXtreme Android and Windows
+'on':
+  workflow_dispatch: {}
+permissions:
+  contents: read
+env:
+  IS_STABLE: ${{ !contains(github.ref, '-') }}
+  FLUTTER_VERSION: 3.47.4
+  GO_VERSION: 1.26.4
+  NDK_VERSION: r28c
+jobs:
+  protocol:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    - uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        cache-dependency-path: core/Clash.Meta/go.sum
+    - name: Protocol and config regression tests
+      working-directory: core/Clash.Meta
+      run: 'go test -race -count=1 ./transport/lightxtreme
+
+        go test -count=1 ./adapter -run TestLightXtremeConfig
+
+        go build -o /tmp/lightxtreme-core .
+
+        '
+    - name: Validate fixture
+      run: "cat > /tmp/lightxtreme.yaml <<'EOF'\nproxies:\n  - name: lightxtreme-fixture\n    type: lightxtreme\n    server: example.invalid\n\
+        \    port: 443\n    password: 00112233445566778899aabbccddeeff\n    platform-marker: 3\n    sni: example.invalid\n    client-fingerprint:\
+        \ chrome\n    udp: true\nrules:\n  - MATCH,lightxtreme-fixture\nEOF\n/tmp/lightxtreme-core -t -f /tmp/lightxtreme.yaml -d /tmp/lxcheck\n"
+  build:
+    needs:
+    - protocol
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - platform: android
+          os: ubuntu-latest
+        - platform: windows
+          os: windows-2022
+          arch: amd64
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    - name: Assert pinned LightXtreme core
+      shell: bash
+      run: 'set -eux
+
+        test "$(git -C core/Clash.Meta rev-parse HEAD)" = 8e4dc3282e114d347a0fbf54728505c5a9cccebb'
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        cache-dependency-path: core/go.sum
+    - name: Setup Rust cache
+      uses: Swatinem/rust-cache@v2
+      with:
+        key: ${{ matrix.platform }}-${{ matrix.arch || 'all' }}
+        workspaces: services/helper
+        cache-directories: .dart_tool/hooks_runner
+    - name: Setup Gradle
+      if: startsWith(matrix.platform,'android')
+      uses: gradle/actions/setup-gradle@v6
+    - name: Enable git long paths (Windows)
+      if: startsWith(matrix.os, 'windows')
+      run: git config --global core.longpaths true
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        channel: master
+        flutter-version: ${{ env.FLUTTER_VERSION }}
+        cache: true
+    - name: Setup NDK
+      if: startsWith(matrix.platform,'android')
+      uses: nttld/setup-ndk@v1
+      id: build-ndk
+      with:
+        ndk-version: ${{ env.NDK_VERSION }}
+        add-to-path: true
+        link-to-sdk: true
+    - name: Get Flutter Dependency
+      run: 'flutter --version
+
+        flutter pub get
+
+        '
+    - name: Setup
+      env:
+        ANDROID_NDK_HOME: ${{ steps.build-ndk.outputs.ndk-path }}
+      run: dart setup.dart ${{ matrix.platform }} --env pre -v
+    - name: Upload packages
+      uses: actions/upload-artifact@v4
+      with:
+        name: lightxtreme-${{ matrix.platform }}
+        path: dist/**
+        if-no-files-found: error
+    - name: Upload build evidence
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: evidence-${{ matrix.platform }}
+        path: .dart_tool/setup_build_cache/hook.log
+        if-no-files-found: ignore
+  publish:
+    needs:
+    - build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+    - uses: actions/download-artifact@v4
+      with:
+        pattern: lightxtreme-*
+        path: dist
+        merge-multiple: true
+    - name: Publish packages
+      env:
+        GH_TOKEN: ${{ github.token }}
+        REPO: ${{ github.repository }}
+        RUN_ID: ${{ github.run_id }}
+      run: 'set -eux
+
+        find dist -type f -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS.txt
+
+        gh release create "lightxtreme-$RUN_ID" --repo "$REPO" --prerelease --title "FlClash LightXtreme $RUN_ID" --notes "Official FlClash baseline;
+        only LightXtreme added. Android uses upstream development signing fallback. No device testing claimed." $(find dist -type f) SHA256SUMS.txt
+
+        '
